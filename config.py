@@ -1,10 +1,13 @@
+import torch
+
 ANNOTATION = "dataset/ann.json"
 IMAGES = "dataset/images"
 
-TRAIN_SET = None
-VALID_SET = None
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-IMAGES_SIZE = [210, 60]
+EPOCHS = 100
 BATCH_SIZE = 16
 WORKERS_NUMBER = 4
 CLASSES_NUMBER = 10
+LEARNING_RATE = 0.001
+IMAGES_SIZE = [210, 60]
