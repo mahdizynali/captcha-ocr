@@ -1,7 +1,7 @@
 import torch
 from config import *
 import numpy as np
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Subset, random_split
 import torchvision.transforms as transforms
 from pycocotools.coco import COCO
 from PIL import Image
@@ -11,7 +11,6 @@ import os
 import matplotlib.pyplot as plt
 import torchvision.transforms.functional as TF
 from PIL import ImageDraw
-
 
 class COCODataset(Dataset):
     def __init__(self, root, annFile, transform=None):
@@ -35,23 +34,64 @@ class COCODataset(Dataset):
         if self.transform is not None:
             img = Image.fromarray(img)
             img = self.transform(img)
-        # print(f"Image shape after transform: {img.shape}")
+        
         return img, anns
 
-# transform augmentation
 transform = transforms.Compose([
     transforms.Resize((IMAGES_SIZE[1], IMAGES_SIZE[0])),
-    # transforms.RandomHorizontalFlip(),
-    # transforms.RandomVerticalFlip(),  # if use it , you must do the same for annotations
-    # transforms.RandomRotation(30), 
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.5], std=[0.5])
 ])
 
+
 coco_dataset = COCODataset(IMAGES, ANNOTATION, transform=transform)
 
-dataloader = DataLoader(coco_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=WORKERS_NUMBER)
+train_size = int(0.8 * len(coco_dataset))  # 80-20 split
+val_size = len(coco_dataset) - train_size
+train_dataset, val_dataset = random_split(coco_dataset, [train_size, val_size])
 
+def collate_fn(batch):
+    images, annotations = zip(*batch)
+
+    # Stack images into a single tensor
+    images = torch.stack([transforms.ToTensor()(img) for img in images])
+
+    # Pad annotations if needed
+    max_len = max(len(ann) for ann in annotations)
+    padded_annotations = []
+    for ann in annotations:
+        ann_padded = ann + [{}] * (max_len - len(ann))  # Pad with empty dicts
+        padded_annotations.append(ann_padded)
+
+    return images, padded_annotations
+
+
+def collate_fn(batch):
+    images, annotations = zip(*batch)
+
+    # Stack images into a single tensor
+    images = torch.stack(images)
+
+    # Pad annotations if needed
+    max_len = max(len(ann) for ann in annotations)
+    padded_annotations = []
+    for ann in annotations:
+        ann_padded = ann + [{}] * (max_len - len(ann))  # Pad with empty dicts
+        padded_annotations.append(ann_padded)
+
+    return images, padded_annotations
+
+
+train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=WORKERS_NUMBER, collate_fn=collate_fn)
+val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=WORKERS_NUMBER, collate_fn=collate_fn)
+
+
+for i, (images, annotations) in enumerate(train_loader):
+    print(f"Batch {i+1}")
+    print("Images shape:", images.shape)  # Shape of the batch of images
+    # print("Annotations:", annotations)  # Annotations for the batch
+    if i == 1:  # Just show the first 2 batches for brevity
+        break
 
 #=========================================================================================
 
@@ -76,6 +116,5 @@ def show_images(dataset, num_images=5):
         axes[i].set_title(f'Image {i}')
     plt.show()
 
-show_images(coco_dataset, num_images=5)
-
+# show_images(val_dataset, num_images=5)
 #=========================================================================================
