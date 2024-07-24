@@ -1,7 +1,7 @@
 import torch
 from config import *
 import numpy as np
-from torch.utils.data import Dataset, DataLoader, Subset, random_split
+from torch.utils.data import Dataset, DataLoader, random_split
 import torchvision.transforms as transforms
 from pycocotools.coco import COCO
 from PIL import Image
@@ -50,21 +50,6 @@ train_size = int(0.8 * len(coco_dataset))  # 80-20 split
 val_size = len(coco_dataset) - train_size
 train_dataset, val_dataset = random_split(coco_dataset, [train_size, val_size])
 
-def collate_fn(batch):
-    images, annotations = zip(*batch)
-
-    # Stack images into a single tensor
-    images = torch.stack([transforms.ToTensor()(img) for img in images])
-
-    # Pad annotations if needed
-    max_len = max(len(ann) for ann in annotations)
-    padded_annotations = []
-    for ann in annotations:
-        ann_padded = ann + [{}] * (max_len - len(ann))  # Pad with empty dicts
-        padded_annotations.append(ann_padded)
-
-    return images, padded_annotations
-
 
 def collate_fn(batch):
     images, annotations = zip(*batch)
@@ -82,16 +67,16 @@ def collate_fn(batch):
     return images, padded_annotations
 
 
-train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=WORKERS_NUMBER, collate_fn=collate_fn)
-val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=WORKERS_NUMBER, collate_fn=collate_fn)
+TRAIN_SET = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=WORKERS_NUMBER, collate_fn=collate_fn)
+VALID_SET = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=WORKERS_NUMBER, collate_fn=collate_fn)
 
 
-for i, (images, annotations) in enumerate(train_loader):
-    print(f"Batch {i+1}")
-    print("Images shape:", images.shape)  # Shape of the batch of images
-    # print("Annotations:", annotations)  # Annotations for the batch
-    if i == 1:  # Just show the first 2 batches for brevity
-        break
+# for i, (images, annotations) in enumerate(TRAIN_SET):
+#     print(f"Batch {i+1}")
+#     print("Images shape:", images.shape)  # Shape of the batch of images
+#     # print("Annotations:", annotations)  # Annotations for the batch
+#     if i == 1:  # Just show the first 2 batches for brevity
+#         break
 
 #=========================================================================================
 
