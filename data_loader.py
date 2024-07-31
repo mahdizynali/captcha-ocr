@@ -38,7 +38,10 @@ class COCODataset(Dataset):
             xmax = xmin + anns[i]['bbox'][2]
             ymax = ymin + anns[i]['bbox'][3]
             boxes.append([xmin, ymin, xmax, ymax])
-            labels.append(anns[i]['category_id'])
+            
+            category_id = anns[i]['category_id']
+            label = category_id_to_label[category_id]
+            labels.append(label)
 
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
         labels = torch.as_tensor(labels, dtype=torch.int64)
@@ -95,13 +98,10 @@ def collate_fn(batch):
     padded_boxes = [torch.cat([b, torch.zeros(max_boxes - len(b), 4)], dim=0) for b in boxes]
     padded_labels = [torch.cat([l, torch.zeros(max_boxes - len(l))], dim=0) for l in labels]
     
-    masks = [torch.cat([torch.ones(len(b)), torch.zeros(max_boxes - len(b))], dim=0) for b in boxes]
-
     boxes_tensor = torch.stack(padded_boxes)
     labels_tensor = torch.stack(padded_labels)
-    masks_tensor = torch.stack(masks)
     
-    targets = {'boxes': boxes_tensor, 'labels': labels_tensor, 'masks': masks_tensor}
+    targets = {'boxes': boxes_tensor, 'labels': labels_tensor}
     return images, targets
 
 
@@ -120,7 +120,7 @@ def create_dataset():
 
     TRAIN_SET = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=WORKERS_NUMBER, collate_fn=collate_fn)
     VALID_SET = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=WORKERS_NUMBER, collate_fn=collate_fn)
-    # show_images(TRAIN_SET.dataset, num_images=10)
+    # show_images(TRAIN_SET.dataset, num_images=5)
 
     # for imgs, annotations in TRAIN_SET:
     #     imgs = imgs.to("cuda") 

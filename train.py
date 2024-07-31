@@ -5,7 +5,7 @@ import torch.optim as optim
 from network import Captcha_Model
 
 model = Captcha_Model().to(DEVICE)
-bbox_criterion = nn.MSELoss()
+bbox_criterion = nn.SmoothL1Loss()
 class_criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
@@ -13,25 +13,36 @@ def train(model, train_loader, bbox_criterion, class_criterion, optimizer, devic
     model.train()
     running_loss = 0.0
     for images, targets in train_loader:
-        images = torch.stack([img.to(device) for img in images])
-        targets_boxes = torch.cat([t['boxes'].to(device) for t in targets])
-        targets_labels = torch.cat([t['labels'].to(device) for t in targets])
+        images = images.to(device)
+        targets_boxes = targets['boxes'].to(device)
+        targets_labels = targets['labels'].to(device)
         
         optimizer.zero_grad()
         
         outputs_bbox, outputs_class = model(images)
+
+        print(f"outputs_class shape: {outputs_bbox.shape}")
+        print(f"outputs_class: {outputs_class.shape}")
+        print(f"targets_labels shape: {targets_labels.shape}")
+        print(f"targets_labels: {targets_labels.shape}")
+        
         loss_bbox = bbox_criterion(outputs_bbox, targets_boxes)
         loss_class = class_criterion(outputs_class, targets_labels)
         loss = loss_bbox + loss_class
         
         loss.backward()
         optimizer.step()
-
+        
         running_loss += loss.item() * images.size(0)
+
+    epoch_loss = running_loss / len(train_loader.dataset)
+    print(f"Epoch loss: {epoch_loss:.4f}")
+
     
     epoch_loss = running_loss / len(train_loader.dataset)
     print(f"Training loss: {epoch_loss:.4f}")
     return epoch_loss
+
 
 
 def evaluate(model, val_loader, bbox_criterion, class_criterion, device):
