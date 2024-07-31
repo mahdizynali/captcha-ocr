@@ -5,24 +5,25 @@ import torch.optim as optim
 from network import Captcha_Model
 
 model = Captcha_Model().to(DEVICE)
-criterion = nn.CrossEntropyLoss()
+bbox_criterion = nn.MSELoss()
+class_criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
-def train(model, train_loader, criterion, optimizer, device):
+def train(model, train_loader, bbox_criterion, class_criterion, optimizer, device):
     model.train()
     running_loss = 0.0
-    for images, annotations in train_loader:
-
-        images = images.to(device) 
-        boxes = [t['boxes'].to(device) for t in annotations]
-        boxes = torch.cat(boxes, dim=0)
+    for images, targets in train_loader:
+        images = torch.stack([img.to(device) for img in images])
+        targets_boxes = torch.cat([t['boxes'].to(device) for t in targets])
+        targets_labels = torch.cat([t['labels'].to(device) for t in targets])
         
         optimizer.zero_grad()
         
-        outputs = model(images)
-        print(outputs)
-        loss = criterion(outputs, boxes)
-
+        outputs_bbox, outputs_class = model(images)
+        loss_bbox = bbox_criterion(outputs_bbox, targets_boxes)
+        loss_class = class_criterion(outputs_class, targets_labels)
+        loss = loss_bbox + loss_class
+        
         loss.backward()
         optimizer.step()
 
@@ -32,43 +33,45 @@ def train(model, train_loader, criterion, optimizer, device):
     print(f"Training loss: {epoch_loss:.4f}")
     return epoch_loss
 
-def evaluate(model, val_loader, criterion, device):
+
+def evaluate(model, val_loader, bbox_criterion, class_criterion, device):
     model.eval()
     running_loss = 0.0
     corrects = 0
     total = 0
     
     with torch.no_grad():
-        for images, labels in val_loader:
-
-            images = list(image.to(device) for image in images)
-            labels = [{k: v.to(device) for k, v in t.items()} for t in labels]
+        for images, targets in val_loader:
+            images = torch.stack([img.to(device) for img in images])
+            targets_boxes = torch.cat([t['boxes'].to(device) for t in targets])
+            targets_labels = torch.cat([t['labels'].to(device) for t in targets])
             
-            outputs = model(images)
+            outputs_bbox, outputs_class = model(images)
             
-            loss = criterion(outputs, labels)
+            loss_bbox = bbox_criterion(outputs_bbox, targets_boxes)
+            loss_class = class_criterion(outputs_class, targets_labels)
+            loss = loss_bbox + loss_class
+            
             running_loss += loss.item() * images.size(0)
             
-            _, predicted = torch.max(outputs, 1)
-            total += labels.size(0)
-            corrects += (predicted == labels).sum().item()
+            _, predicted = torch.max(outputs_class, 1)
+            total += targets_labels.size(0)
+            corrects += (predicted == targets_labels).sum().item()
     
     epoch_loss = running_loss / len(val_loader.dataset)
     accuracy = corrects / total
     print(f"Validation loss: {epoch_loss:.4f}, Accuracy: {accuracy:.4f}")
     return epoch_loss, accuracy
 
-
 def main():
-
-    TRAIN_SET, VALID_SET =  create_dataset()
+    TRAIN_SET, VALID_SET = create_dataset()
     
     best_accuracy = 0.0
     for epoch in range(EPOCHS):
         print(f"Epoch {epoch+1}/{EPOCHS}")
         
-        train_loss = train(model, TRAIN_SET, criterion, optimizer, DEVICE)
-        val_loss, val_accuracy = evaluate(model, VALID_SET, criterion, DEVICE)
+        train_loss = train(model, TRAIN_SET, bbox_criterion, class_criterion, optimizer, DEVICE)
+        val_loss, val_accuracy = evaluate(model, VALID_SET, bbox_criterion, class_criterion, DEVICE)
         
         if val_accuracy > best_accuracy:
             best_accuracy = val_accuracy

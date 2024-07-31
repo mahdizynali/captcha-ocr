@@ -31,25 +31,23 @@ class COCODataset(Dataset):
 
         num_objs = len(anns)
         boxes = []
+        labels = []
         for i in range(num_objs):
             xmin = anns[i]['bbox'][0]
             ymin = anns[i]['bbox'][1]
             xmax = xmin + anns[i]['bbox'][2]
             ymax = ymin + anns[i]['bbox'][3]
             boxes.append([xmin, ymin, xmax, ymax])
+            labels.append(anns[i]['category_id'])
+
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
-        
-        labels = torch.ones((num_objs,), dtype=torch.int64)
+        labels = torch.as_tensor(labels, dtype=torch.int64)
         img_id = torch.tensor([img_id])
-        areas = torch.as_tensor([ann['area'] for ann in anns], dtype=torch.float32)
-        iscrowd = torch.zeros((num_objs,), dtype=torch.int64)
         
         target = {}
         target["boxes"] = boxes
         target["labels"] = labels
         target["image_id"] = img_id
-        target["area"] = areas
-        target["iscrowd"] = iscrowd
 
         if self.transform is not None:
             img = self.transform(img)
@@ -58,7 +56,6 @@ class COCODataset(Dataset):
     
 
 def draw_boxes(image, annotations):
-    """Draw bounding boxes on the image."""
     draw = ImageDraw.Draw(image)
     for ann in annotations:
         if 'boxes' in ann:
@@ -82,10 +79,31 @@ def show_images(dataset, num_images=5):
     plt.show()
 
 
+# def collate_fn(batch):
+#     images, targets = zip(*batch)
+#     images = torch.stack(images)
+#     return images, targets
+
 def collate_fn(batch):
     images, targets = zip(*batch)
     images = torch.stack(images)
+    
+    boxes = [t['boxes'] for t in targets]
+    labels = [t['labels'] for t in targets]
+    max_boxes = max(len(b) for b in boxes)
+    
+    padded_boxes = [torch.cat([b, torch.zeros(max_boxes - len(b), 4)], dim=0) for b in boxes]
+    padded_labels = [torch.cat([l, torch.zeros(max_boxes - len(l))], dim=0) for l in labels]
+    
+    masks = [torch.cat([torch.ones(len(b)), torch.zeros(max_boxes - len(b))], dim=0) for b in boxes]
+
+    boxes_tensor = torch.stack(padded_boxes)
+    labels_tensor = torch.stack(padded_labels)
+    masks_tensor = torch.stack(masks)
+    
+    targets = {'boxes': boxes_tensor, 'labels': labels_tensor, 'masks': masks_tensor}
     return images, targets
+
 
 def create_dataset():
     transform = transforms.Compose([
@@ -102,7 +120,6 @@ def create_dataset():
 
     TRAIN_SET = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=WORKERS_NUMBER, collate_fn=collate_fn)
     VALID_SET = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=WORKERS_NUMBER, collate_fn=collate_fn)
-    
     # show_images(TRAIN_SET.dataset, num_images=10)
 
     # for imgs, annotations in TRAIN_SET:
