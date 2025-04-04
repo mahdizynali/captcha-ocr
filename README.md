@@ -4,3 +4,4 @@ A deep learning-based solution for detecting and classifying digits from CAPTCHA
 ## Dataset
 In this project im using coco dataset which i have provided from real captchas that you must organize in dataset folder
 ![alt text](https://raw.githubusercontent.com/mahdizynali/captcha-ocr/refs/heads/main/dataset/images/w_123.jpg)
+![alt text](https://github.com/mahdizynali/captcha-ocr/blob/main/dataset/images/captcha_061.jpg)
