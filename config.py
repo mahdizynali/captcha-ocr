@@ -1,4 +1,5 @@
 import torch
+import os
 
 ANNOTATION = "dataset/ann.json"
 IMAGES = "dataset/images"
@@ -24,3 +25,6 @@ category_id_to_label = {
     9: 2,  # two
     10: 1  # one
 }
+
+SAVE_PATH = './saved_models'
+os.makedirs(SAVE_PATH, exist_ok=True)
